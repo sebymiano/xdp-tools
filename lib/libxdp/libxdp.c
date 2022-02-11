@@ -1370,11 +1370,11 @@ int xdp_program__pin(struct xdp_program *prog, const char *pin_path)
 	return libxdp_err(bpf_program__pin(prog->bpf_prog, pin_path));
 }
 
-static int xdp_program__load(struct xdp_program *prog)
+int xdp_program__load(struct xdp_program *prog, int flags)
 {
 	int err;
 
-	if (!prog)
+	if (!prog || flags)
 		return -EINVAL;
 
 	if (prog->prog_fd >= 0)
@@ -1434,7 +1434,7 @@ static int xdp_program__attach_single(struct xdp_program *prog, int ifindex,
 	int err;
 
 	bpf_program__set_type(prog->bpf_prog, BPF_PROG_TYPE_XDP);
-	err = xdp_program__load(prog);
+	err = xdp_program__load(prog, 0);
 	if (err)
 		return err;
 
@@ -1784,7 +1784,7 @@ static int xdp_multiprog__load(struct xdp_multiprog *mp)
 	pr_debug("Loading multiprog dispatcher for %d programs\n",
 		 mp->config.num_progs_enabled);
 
-	err = xdp_program__load(mp->main_prog);
+	err = xdp_program__load(mp->main_prog, 0);
 	if (err) {
 		if (err == -LIBBPF_ERRNO__VERIFY) {
 			pr_warn("Got verifier error while loading dispatcher.\n");
@@ -2188,7 +2188,7 @@ static int xdp_multiprog__check_compat(struct xdp_multiprog *mp)
 
 	bpf_program__set_type(test_prog->bpf_prog, BPF_PROG_TYPE_EXT);
 	bpf_program__set_expected_attach_type(test_prog->bpf_prog, 0);
-	err = xdp_program__load(test_prog);
+	err = xdp_program__load(test_prog, 0);
 	if (err) {
 		char buf[100] = {};
 		libxdp_strerror(err, buf, sizeof(buf));
@@ -2336,7 +2336,7 @@ static int xdp_multiprog__link_prog(struct xdp_multiprog *mp,
 
 		bpf_program__set_type(prog->bpf_prog, BPF_PROG_TYPE_EXT);
 		bpf_program__set_expected_attach_type(prog->bpf_prog, 0);
-		err = xdp_program__load(prog);
+		err = xdp_program__load(prog, 0);
 		if (err) {
 			if (err == -E2BIG) {
 				pr_debug("Got 'argument list too long' error while "

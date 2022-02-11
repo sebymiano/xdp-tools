@@ -57,6 +57,7 @@ struct xdp_program *xdp_program__from_fd(int fd);
 struct xdp_program *xdp_program__from_id(__u32 prog_id);
 struct xdp_program *xdp_program__from_pin(const char *pin_path);
 
+int xdp_program__load(struct xdp_program *xdp_prog, int flags);
 void xdp_program__close(struct xdp_program *xdp_prog);
 
 enum xdp_attach_mode xdp_program__is_attached(const struct xdp_program *xdp_prog,
