@@ -56,6 +56,7 @@ struct xdp_program {
 	struct bpf_program *bpf_prog;
 	struct bpf_object *bpf_obj;
 	struct btf *btf;
+	enum bpf_prog_type prog_type;
 	int prog_fd;
 	int link_fd;
 	char *prog_name;
@@ -1189,6 +1190,7 @@ static int xdp_program__fill_from_fd(struct xdp_program *xdp_prog, int fd)
 	xdp_prog->load_time = info.load_time;
 	xdp_prog->prog_fd = fd;
 	xdp_prog->prog_id = info.id;
+	xdp_prog->prog_type = info.type;
 
 	return 0;
 err:
@@ -1372,7 +1374,8 @@ int xdp_program__pin(struct xdp_program *prog, const char *pin_path)
 
 int xdp_program__load(struct xdp_program *prog, int flags)
 {
-	int err;
+	bool is_loaded, autoload;
+	int err, prog_fd;
 
 	if (!prog || flags)
 		return -EINVAL;
@@ -1380,18 +1383,35 @@ int xdp_program__load(struct xdp_program *prog, int flags)
 	if (prog->prog_fd >= 0)
 		return -EEXIST;
 
-	if (!prog->bpf_obj)
+	if (!prog->bpf_obj || !prog->bpf_prog)
 		return -EINVAL;
 
-	err = bpf_object__load(prog->bpf_obj);
-	if (err)
-		return err;
+	/* bpf_program__set_autoload fails if the object is loaded, use this to
+	 * detect if it is (since libbpf doesn't expose an API to discover
+	 * this). This is necessary because of objects containing multiple
+	 * programs: if a user creates xdp_program references to programs in
+	 * such an object before loading it, they will get out of sync.
+	 */
+	autoload = bpf_program__autoload(prog->bpf_prog);
+	is_loaded = !!bpf_program__set_autoload(prog->bpf_prog, autoload);
+	if (is_loaded) {
+		pr_debug("XDP program %s is already loaded with fd %d\n",
+			 xdp_program__name(prog), bpf_program__fd(prog->bpf_prog));
+	} else {
+		/* We got an explicit load request, make sure we actually load */
+		if (!autoload)
+			bpf_program__set_autoload(prog->bpf_prog, true);
 
-	pr_debug("Loaded XDP program %s, got fd %d\n",
-		 xdp_program__name(prog), bpf_program__fd(prog->bpf_prog));
+		err = bpf_object__load(prog->bpf_obj);
+		if (err)
+			return err;
+
+		pr_debug("Loaded XDP program %s, got fd %d\n",
+			 xdp_program__name(prog), bpf_program__fd(prog->bpf_prog));
+	}
 
 	/* Duplicate the descriptor, as xdp_program__fill_from_fd takes ownership */
-	int prog_fd = fcntl(bpf_program__fd(prog->bpf_prog), F_DUPFD_CLOEXEC, MIN_FD);
+	prog_fd = fcntl(bpf_program__fd(prog->bpf_prog), F_DUPFD_CLOEXEC, MIN_FD);
 	if (prog_fd < 0) {
 		err = -errno;
 		pr_debug("Error on fcntl: %s", strerror(-err));
