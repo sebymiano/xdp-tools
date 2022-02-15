@@ -26,6 +26,7 @@
 #include <linux/magic.h>
 
 #include <bpf/libbpf.h>
+#include <bpf/bpf.h>
 #include <bpf/btf.h>
 #include <xdp/libxdp.h>
 #include <xdp/prog_dispatcher.h>
@@ -1761,6 +1762,25 @@ int xdp_program__detach(struct xdp_program *prog, int ifindex,
 		return -EINVAL;
 
 	return libxdp_err(xdp_program__detach_multi(&prog, 1, ifindex, mode, flags));
+}
+
+int xdp_program__test_run(struct xdp_program *prog, struct bpf_test_run_opts *opts)
+{
+	if (!prog || IS_ERR(prog))
+		return libxdp_err(-EINVAL);
+
+	if (!prog->prog_fd) {
+		pr_warn("Program must be loaded before test run\n");
+		return libxdp_err(-EBADF);
+	}
+
+	if (prog->prog_type != BPF_PROG_TYPE_XDP) {
+		/* FIXME: Deal with case where program is loaded as TYPE_EXT */
+		pr_warn("Can't test_run non-XDP programs\n");
+		return libxdp_err(-ENOEXEC);
+	}
+
+	return bpf_prog_test_run_opts(prog->prog_fd, opts);
 }
 
 void xdp_multiprog__close(struct xdp_multiprog *mp)
