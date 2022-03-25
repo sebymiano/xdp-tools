@@ -70,4 +70,5 @@ LIBXDP_1.2.0 {
 
 LIBXDP_1.3.0 {
 		xdp_program__create;
+		xdp_program__load_prog;
 } LIBXDP_1.2.0;

@@ -96,6 +96,8 @@ int xdp_program__detach_multi(struct xdp_program **progs, size_t num_progs,
                               int ifindex, enum xdp_attach_mode mode,
                               unsigned int flags);
 
+int xdp_program__load_prog(struct xdp_program *prog);
+
 struct xdp_multiprog *xdp_multiprog__get_from_ifindex(int ifindex);
 struct xdp_program *xdp_multiprog__next_prog(const struct xdp_program *prog,
 					     const struct xdp_multiprog *mp);
